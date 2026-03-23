@@ -11,9 +11,10 @@ interface Props {
 
 // 可用模型列表
 const AVAILABLE_MODELS = [
-  { value: 'gemini-3-pro-image-preview', label: 'Gemini 3 Pro' },
-  { value: 'gemini-2.5-flash-image-preview', label: 'Gemini 2.5 Flash (Preview)' },
-  { value: 'gemini-2.5-flash-image', label: 'Gemini 2.5 Flash' }
+  { value: 'gemini-3-pro-image-preview', label: 'Gemini 3 Pro (Preview)' },
+  { value: 'gemini-3.0-pro-image', label: 'Gemini 3 Pro flow' },
+  { value: 'gemini-3.1-flash-image-preview', label: 'Gemini 3.1 Flash (Preview)' },
+  { value: 'gemini-3.1-flash-image', label: 'Gemini 3.1 Flash flow' }
 ] as const;
 
 const fileToBase64 = (file: File): Promise<string> => {
