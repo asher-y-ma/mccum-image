@@ -83,23 +83,48 @@ export function clampAspectRatioForModel(
   return 'Auto';
 }
 
-/**
- * 仅部分模型支持 imageConfig.imageSize（1K / 2K / 4K）。
- * Flash 系列通常固定输出或不暴露该档位，故仅对 Pro 图像模型开放 UI。
- */
-const RESOLUTION_SUPPORTED_MODEL_IDS = new Set<string>(['gemini-3-pro-image-preview', 'gemini-3.0-pro-image']);
+/** 支持 1K / 2K / 4K */
+const RESOLUTION_1K_2K_4K_MODEL_IDS = new Set<string>([
+  'gemini-3-pro-image-preview',
+  'gemini-3.1-flash-image-preview',
+]);
 
-export function supportsImageResolution(modelName: string | undefined): boolean {
+/** 仅支持 1K / 2K（无 4K） */
+const RESOLUTION_1K_2K_MODEL_IDS = new Set<string>([
+  'gemini-3.0-pro-image',
+  'gemini-3.1-flash-image',
+]);
+
+export function getSupportedImageResolutions(
+  modelName: string | undefined
+): readonly AppSettings['resolution'][] {
   const id = modelName || DEFAULT_IMAGE_MODEL;
-  return RESOLUTION_SUPPORTED_MODEL_IDS.has(id);
+  if (RESOLUTION_1K_2K_4K_MODEL_IDS.has(id)) return ['1K', '2K', '4K'];
+  if (RESOLUTION_1K_2K_MODEL_IDS.has(id)) return ['1K', '2K'];
+  // 自定义模型 id（如 URL 传入）：默认按全档位开放
+  return ['1K', '2K', '4K'];
+}
+
+/** 是否展示分辨率档位（内置四模型均支持；自定义模型 id 亦展示，按全档位） */
+export function supportsImageResolution(modelName: string | undefined): boolean {
+  return getSupportedImageResolutions(modelName).length > 0;
+}
+
+export function supportsResolutionLevel(
+  modelName: string | undefined,
+  level: AppSettings['resolution']
+): boolean {
+  return getSupportedImageResolutions(modelName).includes(level);
 }
 
 export function clampResolutionForModel(
   modelName: string | undefined,
   resolution: AppSettings['resolution']
 ): AppSettings['resolution'] {
-  if (supportsImageResolution(modelName)) return resolution;
-  return '1K';
+  const allowed = getSupportedImageResolutions(modelName);
+  if (allowed.includes(resolution)) return resolution;
+  if (resolution === '4K' && allowed.includes('2K')) return '2K';
+  return allowed[0] ?? '1K';
 }
 
 /** 请求体中使用的长宽比：不支持或 Auto 时不传 */
@@ -123,8 +148,9 @@ export function buildImageConfig(settings: AppSettings): { imageSize?: string; a
   const cfg: { imageSize?: string; aspectRatio?: string } = {};
   const ar = aspectRatioForApi(model, settings.aspectRatio);
   if (ar) cfg.aspectRatio = ar;
+  const res = clampResolutionForModel(model, settings.resolution);
   if (supportsImageResolution(model)) {
-    cfg.imageSize = settings.resolution;
+    cfg.imageSize = res;
   }
   return Object.keys(cfg).length > 0 ? cfg : undefined;
 }

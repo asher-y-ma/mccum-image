@@ -8,6 +8,7 @@ import {
   IMAGE_MODEL_OPTIONS,
   getAspectRatioOptionsForModel,
   supportsImageResolution,
+  supportsResolutionLevel,
 } from '../constants/geminiModels';
 
 export const SettingsPanel: React.FC = () => {
@@ -155,8 +156,9 @@ export const SettingsPanel: React.FC = () => {
           <label className="block text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 mb-2 sm:mb-3">图像分辨率</label>
           <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
             {(['1K', '2K', '4K'] as const).map((res) => {
-              const isResolutionSupported = supportsImageResolution(settings.modelName);
-              const isDisabled = !isResolutionSupported;
+              const canUse = supportsImageResolution(settings.modelName) &&
+                supportsResolutionLevel(settings.modelName, res);
+              const isDisabled = !canUse;
 
               return (
                 <button
@@ -181,9 +183,10 @@ export const SettingsPanel: React.FC = () => {
               );
             })}
           </div>
-          {!supportsImageResolution(settings.modelName) && (
+          {supportsImageResolution(settings.modelName) &&
+            !supportsResolutionLevel(settings.modelName, '4K') && (
             <p className="text-[10px] sm:text-xs text-gray-400 dark:text-gray-500 mt-1.5 sm:mt-2">
-              ⚠️ 当前模型不支持 1K/2K/4K 分辨率档位（仅 Gemini 3 Pro 预览版与 Gemini 3 Pro flow 可用）
+              ℹ️ 当前模型最高支持 2K；4K 仅适用于 Gemini 3 Pro (Preview) 与 Gemini 3.1 Flash (Preview)
             </p>
           )}
         </section>
