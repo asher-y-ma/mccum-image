@@ -3,6 +3,11 @@ import { persist, createJSONStorage, StateStorage } from 'zustand/middleware';
 import { get as getVal, set as setVal, del as delVal } from 'idb-keyval';
 import { fetchBalance, BalanceInfo } from '../services/balanceService';
 import { AppSettings, ChatMessage, Part, ImageHistoryItem } from '../types';
+import {
+  clampAspectRatioForModel,
+  clampResolutionForModel,
+  DEFAULT_IMAGE_MODEL,
+} from '../constants/geminiModels';
 import { createThumbnail } from '../utils/imageUtils';
 
 // Custom IndexedDB storage
@@ -59,7 +64,7 @@ export const useAppStore = create<AppState>()(
         enableThinking: false,
         streamResponse: true,
         customEndpoint: 'https://api.kuai.host',
-        modelName: 'gemini-3-pro-image-preview',
+        modelName: DEFAULT_IMAGE_MODEL,
         theme: 'system',
       },
       messages: [],
@@ -84,8 +89,13 @@ export const useAppStore = create<AppState>()(
         }
       },
       
-      updateSettings: (newSettings) => 
-        set((state) => ({ settings: { ...state.settings, ...newSettings } })),
+      updateSettings: (newSettings) =>
+        set((state) => {
+          const merged: AppSettings = { ...state.settings, ...newSettings };
+          merged.aspectRatio = clampAspectRatioForModel(merged.modelName, merged.aspectRatio);
+          merged.resolution = clampResolutionForModel(merged.modelName, merged.resolution);
+          return { settings: merged };
+        }),
 
       addMessage: (message) => 
         set((state) => ({ 

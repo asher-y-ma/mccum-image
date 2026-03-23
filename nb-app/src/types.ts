@@ -1,6 +1,20 @@
+/** 与 Gemini 图像生成 API（ImageConfig.aspectRatio）及 Vertex 文档对齐 */
+export type AspectRatioSetting =
+  | 'Auto'
+  | '1:1'
+  | '2:3'
+  | '3:2'
+  | '3:4'
+  | '4:3'
+  | '4:5'
+  | '5:4'
+  | '9:16'
+  | '16:9'
+  | '21:9';
+
 export interface AppSettings {
   resolution: '1K' | '2K' | '4K';
-  aspectRatio: 'Auto' | '1:1' | '3:4' | '4:3' | '9:16' | '16:9' | '21:9';
+  aspectRatio: AspectRatioSetting;
   useGrounding: boolean;
   enableThinking: boolean;
   streamResponse: boolean;

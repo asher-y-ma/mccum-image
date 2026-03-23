@@ -1,5 +1,6 @@
 import type { Content, Part as SDKPart } from "@google/genai";
 import { AppSettings, Part } from '../types';
+import { buildImageConfig, DEFAULT_IMAGE_MODEL } from '../constants/geminiModels';
 
 // Helper to construct user content
 const constructUserContent = (prompt: string, images: { base64Data: string; mimeType: string }[]): Content => {
@@ -138,16 +139,14 @@ export const streamGeminiResponse = async function* (
 
   const currentUserContent = constructUserContent(prompt, images);
   const contentsPayload = [...cleanHistory, currentUserContent];
+  const imageConfig = buildImageConfig(settings);
 
   try {
     const responseStream = await ai.models.generateContentStream({
-      model: settings.modelName || "gemini-3-pro-image-preview",
+      model: settings.modelName || DEFAULT_IMAGE_MODEL,
       contents: contentsPayload,
       config: {
-        imageConfig: {
-          imageSize: settings.resolution,
-          ...(settings.aspectRatio !== 'Auto' ? { aspectRatio: settings.aspectRatio } : {}),
-        },
+        ...(imageConfig ? { imageConfig } : {}),
         tools: settings.useGrounding ? [{ googleSearch: {} }] : [],
         responseModalities: ["TEXT", "IMAGE"],
         ...(settings.enableThinking ? {
@@ -252,6 +251,7 @@ export const generateContent = async (
 
   const currentUserContent = constructUserContent(prompt, images);
   const contentsPayload = [...cleanHistory, currentUserContent];
+  const imageConfig = buildImageConfig(settings);
 
   try {
     // If signal is aborted before we start, throw immediately
@@ -260,13 +260,10 @@ export const generateContent = async (
     }
 
     const response = await ai.models.generateContent({
-      model: settings.modelName || "gemini-3-pro-image-preview",
+      model: settings.modelName || DEFAULT_IMAGE_MODEL,
       contents: contentsPayload,
       config: {
-        imageConfig: {
-          imageSize: settings.resolution,
-          ...(settings.aspectRatio !== 'Auto' ? { aspectRatio: settings.aspectRatio } : {}),
-        },
+        ...(imageConfig ? { imageConfig } : {}),
         tools: settings.useGrounding ? [{ googleSearch: {} }] : [],
         responseModalities: ["TEXT", "IMAGE"],
         ...(settings.enableThinking ? {

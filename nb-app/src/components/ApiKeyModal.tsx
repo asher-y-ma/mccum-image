@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store/useAppStore';
+import { DEFAULT_IMAGE_MODEL } from '../constants/geminiModels';
 import { Key, ExternalLink, ChevronDown, ChevronRight, Settings2, X } from 'lucide-react';
 
 interface ApiKeyModalProps {
@@ -11,7 +12,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose }) => {
   const [inputKey, setInputKey] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [endpoint, setEndpoint] = useState(settings.customEndpoint || '');
-  const [model, setModel] = useState(settings.modelName || 'gemini-3-pro-image-preview');
+  const [model, setModel] = useState(settings.modelName || DEFAULT_IMAGE_MODEL);
 
   // Sync local state with store settings (e.g. when updated via URL params)
   useEffect(() => {
@@ -126,7 +127,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose }) => {
                       value={model}
                       onChange={(e) => setModel(e.currentTarget.value)}
                       className="w-full rounded-md bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 focus:border-amber-500 focus:outline-none"
-                      placeholder="gemini-3-pro-image-preview"
+                      placeholder={DEFAULT_IMAGE_MODEL}
                     />
                   </div>
 

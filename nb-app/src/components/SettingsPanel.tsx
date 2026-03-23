@@ -3,6 +3,12 @@ import { useAppStore } from '../store/useAppStore';
 import { useUiStore } from '../store/useUiStore';
 import { X, LogOut, Trash2, Share2, Bookmark, DollarSign, RefreshCw, Download } from 'lucide-react';
 import { formatBalance } from '../services/balanceService';
+import {
+  DEFAULT_IMAGE_MODEL,
+  IMAGE_MODEL_OPTIONS,
+  getAspectRatioOptionsForModel,
+  supportsImageResolution,
+} from '../constants/geminiModels';
 
 export const SettingsPanel: React.FC = () => {
   const { apiKey, settings, updateSettings, toggleSettings, removeApiKey, clearHistory, isSettingsOpen, fetchBalance, balance, installPrompt, setInstallPrompt } = useAppStore();
@@ -149,8 +155,7 @@ export const SettingsPanel: React.FC = () => {
           <label className="block text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 mb-2 sm:mb-3">图像分辨率</label>
           <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
             {(['1K', '2K', '4K'] as const).map((res) => {
-              // 只有 gemini-3-pro-image-preview 支持分辨率选择
-              const isResolutionSupported = (settings.modelName || 'gemini-3-pro-image-preview') === 'gemini-3-pro-image-preview';
+              const isResolutionSupported = supportsImageResolution(settings.modelName);
               const isDisabled = !isResolutionSupported;
 
               return (
@@ -176,9 +181,9 @@ export const SettingsPanel: React.FC = () => {
               );
             })}
           </div>
-          {(settings.modelName || 'gemini-3-pro-image-preview') !== 'gemini-3-pro-image-preview' && (
+          {!supportsImageResolution(settings.modelName) && (
             <p className="text-[10px] sm:text-xs text-gray-400 dark:text-gray-500 mt-1.5 sm:mt-2">
-              ⚠️ 当前模型不支持分辨率选择，仅 Gemini 3 Pro 支持此功能
+              ⚠️ 当前模型不支持 1K/2K/4K 分辨率档位（仅 Gemini 3 Pro 预览版与 Gemini 3 Pro flow 可用）
             </p>
           )}
         </section>
@@ -187,16 +192,12 @@ export const SettingsPanel: React.FC = () => {
         <section>
           <label className="block text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 mb-2 sm:mb-3">模型选择</label>
           <div className="space-y-2">
-            {([
-              { name: 'gemini-3-pro-image-preview', label: 'Gemini 3 Pro' },
-              { name: 'gemini-2.5-flash-image-preview', label: 'Gemini 2.5 Flash (Preview)' },
-              { name: 'gemini-2.5-flash-image', label: 'Gemini 2.5 Flash' }
-            ] as const).map((model) => {
-              const isActive = (settings.modelName || 'gemini-3-pro-image-preview') === model.name;
+            {IMAGE_MODEL_OPTIONS.map((model) => {
+              const isActive = (settings.modelName || DEFAULT_IMAGE_MODEL) === model.value;
               return (
                 <button
-                  key={model.name}
-                  onClick={() => updateSettings({ modelName: model.name })}
+                  key={model.value}
+                  onClick={() => updateSettings({ modelName: model.value })}
                   className={`w-full rounded-lg border px-3 py-2 sm:px-4 sm:py-2.5 text-xs sm:text-sm font-medium text-left transition ${
                     isActive
                       ? 'border-amber-500 bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400'
@@ -214,13 +215,17 @@ export const SettingsPanel: React.FC = () => {
         <section>
           <label className="block text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 mb-2 sm:mb-3">长宽比</label>
           <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
-            {(['Auto', '1:1', '3:4', '4:3', '9:16', '16:9', '21:9'] as const).map((ratio) => {
+            {getAspectRatioOptionsForModel(settings.modelName).map((ratio) => {
               const isActive = settings.aspectRatio === ratio;
               const ratioPreviewStyles: Record<string, string> = {
                 'Auto': 'w-6 h-6 border-dashed',
                 '1:1': 'w-6 h-6',
+                '2:3': 'w-5 h-7',
+                '3:2': 'w-7 h-5',
                 '3:4': 'w-5 h-7',
                 '4:3': 'w-7 h-5',
+                '4:5': 'w-5 h-6',
+                '5:4': 'w-6 h-5',
                 '9:16': 'w-4 h-7',
                 '16:9': 'w-7 h-4',
                 '21:9': 'w-8 h-3',
@@ -365,7 +370,7 @@ export const SettingsPanel: React.FC = () => {
 
         {/* Info */}
         <div className="mt-1 pb-2 sm:pb-4 text-center text-[9px] sm:text-[10px] text-gray-400 dark:text-gray-600 space-y-0.5 sm:space-y-1">
-           <p>模型: {settings.modelName || 'gemini-3-pro-image-preview'}</p>
+           <p>模型: {settings.modelName || DEFAULT_IMAGE_MODEL}</p>
            <p className="truncate px-4">接口地址: {settings.customEndpoint || 'https://api.kuai.host'}</p>
         </div>
       </div>

@@ -2,20 +2,13 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { X, Plus, Trash2, ImagePlus, ChevronUp, ChevronDown, Layers, GitBranch, Camera, Grid3x3 } from 'lucide-react';
 import { Attachment, PipelineTemplate, PipelineStep } from '../types';
 import { loadPipelineTemplates, filterTemplatesByMode } from '../services/pipelineTemplateService';
+import { IMAGE_MODEL_OPTIONS } from '../constants/geminiModels';
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
   onExecute: (mode: 'serial' | 'parallel' | 'combination', steps: PipelineStep[], attachments: Attachment[]) => void;
 }
-
-// 可用模型列表
-const AVAILABLE_MODELS = [
-  { value: 'gemini-3-pro-image-preview', label: 'Gemini 3 Pro (Preview)' },
-  { value: 'gemini-3.0-pro-image', label: 'Gemini 3 Pro flow' },
-  { value: 'gemini-3.1-flash-image-preview', label: 'Gemini 3.1 Flash (Preview)' },
-  { value: 'gemini-3.1-flash-image', label: 'Gemini 3.1 Flash flow' }
-] as const;
 
 const fileToBase64 = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -455,7 +448,7 @@ export const PipelineModal: React.FC<Props> = ({ isOpen, onClose, onExecute }) =
                         className="flex-1 px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-500"
                       >
                         <option value="">默认 (继承全局设置)</option>
-                        {AVAILABLE_MODELS.map((model) => (
+                        {IMAGE_MODEL_OPTIONS.map((model) => (
                           <option key={model.value} value={model.value}>
                             {model.label}
                           </option>
