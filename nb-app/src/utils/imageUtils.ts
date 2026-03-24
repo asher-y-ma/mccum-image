@@ -95,6 +95,46 @@ export const openImageInNewTab = (mimeType: string, base64Data: string) => {
   setTimeout(() => URL.revokeObjectURL(url), 60000);
 };
 
+export const openImageUrlInNewTab = (url: string) => {
+  window.open(url, '_blank', 'noopener,noreferrer');
+};
+
+/** 将可跨域访问的图片 URL 拉取为 raw base64（用于再次编辑等） */
+export async function imageUrlToBase64(
+  url: string
+): Promise<{ base64: string; mimeType: string }> {
+  const res = await fetch(url, { mode: 'cors' });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const blob = await res.blob();
+  const mimeType = blob.type || 'image/png';
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result as string);
+    r.onerror = () => reject(new Error('read failed'));
+    r.readAsDataURL(blob);
+  });
+  return { base64: dataUrl.split(',')[1], mimeType };
+}
+
+export async function downloadImageFromUrl(
+  url: string,
+  mimeType: string,
+  filename?: string
+): Promise<void> {
+  const res = await fetch(url, { mode: 'cors' });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const blob = await res.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = objectUrl;
+  const ext = mimeType.split('/')[1] || 'png';
+  link.download = filename || `gemini-image-${Date.now()}.${ext}`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+}
+
 /**
  * 批量下载图片数据集为 ZIP 文件（用于 AI-toolkit 训练）
  * @param parts 包含图片的 Part 数组

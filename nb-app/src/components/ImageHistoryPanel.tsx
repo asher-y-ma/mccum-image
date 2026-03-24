@@ -4,7 +4,7 @@ import { useUiStore } from '../store/useUiStore';
 import { get as getItem } from 'idb-keyval';
 import { X, Download, Trash2, ImageIcon, Search, Copy, ArrowRight, ArrowLeft, RefreshCw, Loader2, Edit } from 'lucide-react';
 import { ImageHistoryItem } from '../types';
-import { downloadImage } from '../utils/imageUtils';
+import { downloadImage, downloadImageFromUrl, imageUrlToBase64 } from '../utils/imageUtils';
 
 interface Props {
   isOpen: boolean;
@@ -32,8 +32,9 @@ export const ImageHistoryPanel: React.FC<Props> = ({ isOpen, onClose }) => {
             .then((data) => {
                 if (data) {
                     setFullResData(data as string);
+                } else if (selectedImage.imageUrl) {
+                    setFullResData(null);
                 } else {
-                    // 如果找不到原图，尝试使用缩略图显示（虽然很模糊）
                     setFullResData(selectedImage.thumbnailData || null);
                 }
             })
@@ -50,8 +51,7 @@ export const ImageHistoryPanel: React.FC<Props> = ({ isOpen, onClose }) => {
 
   // Filter images based on search term
   const filteredHistory = useMemo(() => {
-    // 基础过滤：必须包含缩略图数据才显示，避免破图
-    let list = imageHistory.filter(item => !!item.thumbnailData);
+    let list = imageHistory.filter((item) => !!item.thumbnailData || !!item.imageUrl);
     
     if (searchTerm.trim()) {
         list = list.filter((item) =>
@@ -105,6 +105,13 @@ export const ImageHistoryPanel: React.FC<Props> = ({ isOpen, onClose }) => {
     if (data) {
         downloadImage(image.mimeType, data, `image-${image.timestamp}.${image.mimeType.split('/')[1]}`);
         addToast('图片已下载', 'success');
+    } else if (image.imageUrl) {
+        try {
+          await downloadImageFromUrl(image.imageUrl, image.mimeType, `image-${image.timestamp}.${image.mimeType.split('/')[1]}`);
+          addToast('图片已下载', 'success');
+        } catch {
+          addToast('下载失败：无法拉取链接', 'error');
+        }
     } else {
         addToast('下载失败：找不到原图', 'error');
     }
@@ -160,6 +167,19 @@ export const ImageHistoryPanel: React.FC<Props> = ({ isOpen, onClose }) => {
       });
       onClose(); // Close panel to return to chat
       addToast('图片已添加为参考图', 'success');
+    } else if (image.imageUrl) {
+      try {
+        const { base64, mimeType } = await imageUrlToBase64(image.imageUrl);
+        setPendingReferenceImage({
+          base64Data: base64,
+          mimeType: mimeType || image.mimeType,
+          timestamp: Date.now(),
+        });
+        onClose();
+        addToast('图片已添加为参考图', 'success');
+      } catch {
+        addToast('加载失败：无法拉取链接图（跨域）', 'error');
+      }
     } else {
       addToast('加载失败：找不到原图', 'error');
     }
@@ -258,7 +278,11 @@ export const ImageHistoryPanel: React.FC<Props> = ({ isOpen, onClose }) => {
                   onClick={() => setSelectedImage(image)}
                 >
                   <img
-                    src={`data:${image.mimeType};base64,${image.thumbnailData}`}
+                    src={
+                      image.thumbnailData
+                        ? `data:${image.mimeType};base64,${image.thumbnailData}`
+                        : image.imageUrl || ''
+                    }
                     alt={image.prompt}
                     className="w-full h-full object-cover"
                     loading="lazy"
@@ -345,7 +369,11 @@ export const ImageHistoryPanel: React.FC<Props> = ({ isOpen, onClose }) => {
                   </div>
               ) : (
                   <img
-                    src={`data:${selectedImage.mimeType};base64,${fullResData || selectedImage.thumbnailData}`}
+                    src={
+                      selectedImage.imageUrl && !fullResData && !selectedImage.thumbnailData
+                        ? selectedImage.imageUrl
+                        : `data:${selectedImage.mimeType};base64,${fullResData || selectedImage.thumbnailData || ''}`
+                    }
                     alt={selectedImage.prompt}
                     className="max-w-full max-h-[75vh] object-contain rounded-lg shadow-2xl"
                   />

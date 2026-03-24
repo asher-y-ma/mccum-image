@@ -2,6 +2,31 @@ import type { Content, Part as SDKPart } from "@google/genai";
 import { AppSettings, Part } from '../types';
 import { buildImageConfig, DEFAULT_IMAGE_MODEL } from '../constants/geminiModels';
 
+/** 模型有时同时返回 fileData 与一段与 fileUri 相同的 text，去重避免重复展示 */
+function dedupeFileUriTextParts(parts: Part[]): Part[] {
+  const uris = new Set(
+    parts.filter((p) => p.fileData?.fileUri).map((p) => p.fileData!.fileUri.trim())
+  );
+  return parts.filter((p) => {
+    if (p.text && uris.has(p.text.trim())) return false;
+    return true;
+  });
+}
+
+/**
+ * 同一次回复里若同时出现 inlineData（通常全尺寸 base64）与 fileData（外链），
+ * 只保留 inline，避免同一张图展示两次；仅链接、无 base64 时仍保留 fileData。
+ */
+function preferInlineImageOverFileUri(parts: Part[]): Part[] {
+  const hasNonThoughtInline = parts.some((p) => p.inlineData && !p.thought);
+  if (!hasNonThoughtInline) return parts;
+  return parts.filter((p) => !(p.fileData && !p.thought));
+}
+
+function normalizeModelImageParts(parts: Part[]): Part[] {
+  return preferInlineImageOverFileUri(dedupeFileUriTextParts(parts));
+}
+
 // Helper to construct user content
 const constructUserContent = (prompt: string, images: { base64Data: string; mimeType: string }[]): Content => {
   const userParts: SDKPart[] = [];
@@ -109,8 +134,22 @@ const processSdkParts = (sdkParts: SDKPart[]): Part[] => {
       }
       appParts.push(newPart);
     }
+    else if ((part as SDKPart & { fileData?: { mimeType?: string; fileUri?: string } }).fileData?.fileUri) {
+      const fd = (part as { fileData: { mimeType?: string; fileUri: string } }).fileData;
+      const newPart: Part = {
+        fileData: {
+          mimeType: fd.mimeType || 'image/png',
+          fileUri: fd.fileUri,
+        },
+        thought: isThought,
+      };
+      if (signature) {
+        newPart.thoughtSignature = signature;
+      }
+      appParts.push(newPart);
+    }
   }
-  return appParts;
+  return normalizeModelImageParts(appParts);
 };
 
 export const streamGeminiResponse = async function* (
@@ -131,7 +170,8 @@ export const streamGeminiResponse = async function* (
     if (item.role === 'model') {
       return {
         ...item,
-        parts: item.parts.filter(p => !p.thought)
+        // 不回传 fileUri（易过期且非标准用户侧 inline），避免下游 400
+        parts: item.parts.filter((p) => !p.thought && !(p as Part).fileData),
       };
     }
     return item;
@@ -212,7 +252,23 @@ export const streamGeminiResponse = async function* (
           }
           currentParts.push(newPart);
         }
+        else if ((part as SDKPart & { fileData?: { mimeType?: string; fileUri?: string } }).fileData?.fileUri) {
+          const fd = (part as { fileData: { mimeType?: string; fileUri: string } }).fileData;
+          const newPart: Part = {
+            fileData: {
+              mimeType: fd.mimeType || 'image/png',
+              fileUri: fd.fileUri,
+            },
+            thought: isThought,
+          };
+          if (signature) {
+            newPart.thoughtSignature = signature;
+          }
+          currentParts.push(newPart);
+        }
       }
+
+      currentParts = normalizeModelImageParts(currentParts);
 
       yield {
         userContent: currentUserContent,
@@ -243,7 +299,8 @@ export const generateContent = async (
     if (item.role === 'model') {
       return {
         ...item,
-        parts: item.parts.filter(p => !p.thought)
+        // 不回传 fileUri（易过期且非标准用户侧 inline），避免下游 400
+        parts: item.parts.filter((p) => !p.thought && !(p as Part).fileData),
       };
     }
     return item;

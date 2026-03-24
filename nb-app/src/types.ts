@@ -29,6 +29,11 @@ export interface Part {
     mimeType: string;
     data: string;
   };
+  /** 部分网关/模型返回 GCS 等可访问 URL，而非 inline base64 */
+  fileData?: {
+    mimeType: string;
+    fileUri: string;
+  };
   thought?: boolean;
   thoughtSignature?: string;
   prompt?: string; // 用于数据集下载时的图片标注
@@ -60,6 +65,8 @@ export interface ImageHistoryItem {
   mimeType: string;
   base64Data?: string; // Raw base64 for API (Optional if stored separately)
   thumbnailData?: string; // Base64 thumbnail
+  /** 若尚未拉取为 base64，可直接展示（如官方返回的临时链接） */
+  imageUrl?: string;
   prompt: string; // 生成图片的提示词
   timestamp: number;
   modelName?: string;

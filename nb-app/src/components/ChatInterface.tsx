@@ -5,7 +5,8 @@ import { InputArea } from './InputArea';
 import { PipelineModal } from './PipelineModal';
 import { ErrorBoundary } from './ErrorBoundary';
 import { streamGeminiResponse, generateContent } from '../services/geminiService';
-import { convertMessagesToHistory } from '../utils/messageUtils';
+import { convertMessagesToHistory, partHasRenderableImage } from '../utils/messageUtils';
+import { imageUrlToBase64 } from '../utils/imageUtils';
 import { ChatMessage, Attachment, Part } from '../types';
 import { Sparkles } from 'lucide-react';
 import { lazyWithRetry } from '../utils/lazyLoadUtils';
@@ -230,13 +231,22 @@ export const ChatInterface: React.FC = () => {
       // 收集生成的图片到历史记录
       const finalMessage = useAppStore.getState().messages.slice(-1)[0];
       if (finalMessage && finalMessage.role === 'model') {
-        const imageParts = finalMessage.parts.filter(p => p.inlineData && !p.thought);
-        imageParts.forEach(part => {
+        const imageParts = finalMessage.parts.filter(partHasRenderableImage);
+        imageParts.forEach((part) => {
           if (part.inlineData) {
             addImageToHistory({
               id: `img-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
               mimeType: part.inlineData.mimeType,
               base64Data: part.inlineData.data,
+              prompt: text || '图片生成',
+              timestamp: Date.now(),
+              modelName: settings.modelName,
+            });
+          } else if (part.fileData) {
+            addImageToHistory({
+              id: `img-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              mimeType: part.fileData.mimeType,
+              imageUrl: part.fileData.fileUri,
               prompt: text || '图片生成',
               timestamp: Date.now(),
               modelName: settings.modelName,
@@ -381,15 +391,32 @@ export const ChatInterface: React.FC = () => {
         const lastModelMessage = currentMessages[currentMessages.length - 1];
 
         if (lastModelMessage && lastModelMessage.role === 'model') {
-          // 提取生成的图片作为下一步的输入
-          const generatedImages = lastModelMessage.parts
-            .filter(p => p.inlineData && !p.thought)
-            .map(p => ({
-              file: new File([], "generated"),
-              preview: `data:${p.inlineData!.mimeType};base64,${p.inlineData!.data}`,
-              base64Data: p.inlineData!.data || '',
-              mimeType: p.inlineData!.mimeType || ''
-            }));
+          // 提取生成的图片作为下一步的输入（URL 图需先拉成 base64）
+          const imageParts = lastModelMessage.parts.filter(partHasRenderableImage);
+          const generatedImages: Attachment[] = [];
+          for (const p of imageParts) {
+            if (p.inlineData) {
+              generatedImages.push({
+                file: new File([], "generated"),
+                preview: `data:${p.inlineData.mimeType};base64,${p.inlineData.data}`,
+                base64Data: p.inlineData.data || '',
+                mimeType: p.inlineData.mimeType || '',
+              });
+            } else if (p.fileData) {
+              try {
+                const { base64, mimeType } = await imageUrlToBase64(p.fileData.fileUri);
+                generatedImages.push({
+                  file: new File([], "generated"),
+                  preview: `data:${mimeType};base64,${base64}`,
+                  base64Data: base64,
+                  mimeType,
+                });
+              } catch (e) {
+                console.error('串行编排：无法拉取上一步图片 URL', e);
+                addToast('上一步返回的是链接图，拉取失败，无法作为下一步参考图', 'error');
+              }
+            }
+          }
 
           if (generatedImages.length > 0) {
             currentAttachments = generatedImages;
@@ -502,7 +529,7 @@ export const ChatInterface: React.FC = () => {
 
         // 收集生成的部分，为图片附加 prompt 信息（用于数据集下载）
         const partsWithPrompt = result.modelParts.map(part => {
-          if (part.inlineData && !part.thought) {
+          if (partHasRenderableImage(part)) {
             return { ...part, prompt: step.prompt };
           }
           return part;
@@ -517,13 +544,22 @@ export const ChatInterface: React.FC = () => {
         updateLastMessage(allGeneratedParts, false, undefined);
 
         // 将生成的图片添加到历史记录
-        const imageParts = result.modelParts.filter(p => p.inlineData && !p.thought);
-        imageParts.forEach(part => {
+        const imageParts = result.modelParts.filter(partHasRenderableImage);
+        imageParts.forEach((part) => {
           if (part.inlineData) {
             addImageToHistory({
               id: `img-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
               mimeType: part.inlineData.mimeType,
               base64Data: part.inlineData.data,
+              prompt: step.prompt,
+              timestamp: Date.now(),
+              modelName: step.modelName || settings.modelName,
+            });
+          } else if (part.fileData) {
+            addImageToHistory({
+              id: `img-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              mimeType: part.fileData.mimeType,
+              imageUrl: part.fileData.fileUri,
               prompt: step.prompt,
               timestamp: Date.now(),
               modelName: step.modelName || settings.modelName,
@@ -554,7 +590,7 @@ export const ChatInterface: React.FC = () => {
     useAppStore.getState().updateSettings({ modelName: originalSettings.modelName });
 
     setBatchProgress({ current: 0, total: 0 });
-    addToast(`并行编排完成！共生成 ${allGeneratedParts.filter(p => p.inlineData).length} 张图片`, 'success');
+    addToast(`并行编排完成！共生成 ${allGeneratedParts.filter(partHasRenderableImage).length} 张图片`, 'success');
   };
 
   // 批量组合执行: n 图片 × m 提示词
@@ -652,7 +688,7 @@ export const ChatInterface: React.FC = () => {
 
             // 收集生成的部分，附加 prompt 信息
             const partsWithPrompt = result.modelParts.map(part => {
-              if (part.inlineData && !part.thought) {
+              if (partHasRenderableImage(part)) {
                 return { ...part, prompt: step.prompt };
               }
               return part;
@@ -667,13 +703,22 @@ export const ChatInterface: React.FC = () => {
             updateLastMessage(allGeneratedParts, false, undefined);
 
             // 将生成的图片添加到历史记录
-            const imageParts = result.modelParts.filter(p => p.inlineData && !p.thought);
-            imageParts.forEach(part => {
+            const imageParts = result.modelParts.filter(partHasRenderableImage);
+            imageParts.forEach((part) => {
               if (part.inlineData) {
                 addImageToHistory({
                   id: `img-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
                   mimeType: part.inlineData.mimeType,
                   base64Data: part.inlineData.data,
+                  prompt: step.prompt,
+                  timestamp: Date.now(),
+                  modelName: step.modelName || settings.modelName,
+                });
+              } else if (part.fileData) {
+                addImageToHistory({
+                  id: `img-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                  mimeType: part.fileData.mimeType,
+                  imageUrl: part.fileData.fileUri,
                   prompt: step.prompt,
                   timestamp: Date.now(),
                   modelName: step.modelName || settings.modelName,
@@ -708,7 +753,7 @@ export const ChatInterface: React.FC = () => {
     useAppStore.getState().updateSettings({ modelName: originalSettings.modelName });
 
     setBatchProgress({ current: 0, total: 0 });
-    addToast(`批量组合完成！共生成 ${allGeneratedParts.filter(p => p.inlineData).length} 张图片`, 'success');
+    addToast(`批量组合完成！共生成 ${allGeneratedParts.filter(partHasRenderableImage).length} 张图片`, 'success');
   };
 
   return (

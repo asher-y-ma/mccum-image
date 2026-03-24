@@ -4,7 +4,14 @@ import remarkGfm from 'remark-gfm';
 import { ChatMessage, Part } from '../types';
 import { User, Sparkles, ChevronDown, ChevronRight, BrainCircuit, Trash2, RotateCcw, Download, Edit, PackageOpen } from 'lucide-react';
 import { useUiStore } from '../store/useUiStore';
-import { downloadImage, openImageInNewTab, downloadDatasetZip } from '../utils/imageUtils';
+import {
+  downloadImage,
+  openImageInNewTab,
+  downloadDatasetZip,
+  downloadImageFromUrl,
+  openImageUrlInNewTab,
+  imageUrlToBase64,
+} from '../utils/imageUtils';
 
 interface Props {
   message: ChatMessage;
@@ -16,7 +23,7 @@ interface Props {
 
 const ThinkingContentItem: React.FC<{ part: Part }> = ({ part }) => {
   const [isImageHovered, setIsImageHovered] = useState(false);
-  const { setPendingReferenceImage } = useUiStore();
+  const { setPendingReferenceImage, addToast } = useUiStore();
 
   if (part.text) {
     return (
@@ -84,22 +91,108 @@ const ThinkingContentItem: React.FC<{ part: Part }> = ({ part }) => {
     );
   }
 
+  if (part.fileData) {
+    const handleReEdit = async (e: React.MouseEvent) => {
+      e.stopPropagation();
+      try {
+        const { base64, mimeType } = await imageUrlToBase64(part.fileData!.fileUri);
+        setPendingReferenceImage({
+          base64Data: base64,
+          mimeType,
+          timestamp: Date.now(),
+        });
+      } catch {
+        addToast('无法拉取该链接用于再次编辑（跨域限制）', 'error');
+      }
+    };
+
+    return (
+      <div
+        className="relative my-2 overflow-hidden rounded-md border border-gray-200 dark:border-gray-700/50 bg-gray-100 dark:bg-black/20 max-w-sm mx-auto group"
+        onMouseEnter={() => setIsImageHovered(true)}
+        onMouseLeave={() => setIsImageHovered(false)}
+      >
+        <img
+          src={part.fileData.fileUri}
+          alt="Thinking process sketch"
+          className="h-auto max-w-full object-contain opacity-80 hover:opacity-100 transition cursor-pointer"
+          loading="lazy"
+          onClick={() => openImageUrlInNewTab(part.fileData!.fileUri)}
+          title="点击查看大图"
+        />
+
+        <div className={`absolute top-2 right-2 flex gap-2 transition-all ${isImageHovered ? 'opacity-100' : 'opacity-0'}`}>
+          <button
+            onClick={handleReEdit}
+            className="p-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white shadow-lg backdrop-blur-sm transition-all"
+            title="再次编辑"
+          >
+            <Edit className="h-4 w-4" />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              downloadImageFromUrl(part.fileData!.fileUri, part.fileData.mimeType).catch(() =>
+                addToast('下载失败', 'error')
+              );
+            }}
+            className="p-2 rounded-lg bg-black/60 hover:bg-black/80 text-white shadow-lg backdrop-blur-sm transition-all"
+            title="下载图片"
+          >
+            <Download className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return null;
 };
 
 const ImageWithDownload: React.FC<{ part: Part; index: number }> = ({ part, index }) => {
   const [isImageHovered, setIsImageHovered] = useState(false);
-  const { setPendingReferenceImage } = useUiStore();
+  const { setPendingReferenceImage, addToast } = useUiStore();
 
-  if (!part.inlineData) return null;
+  const inline = part.inlineData;
+  const file = part.fileData;
+  if (!inline && !file) return null;
 
-  const handleReEdit = (e: React.MouseEvent) => {
+  const handleReEdit = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    setPendingReferenceImage({
-      base64Data: part.inlineData!.data,
-      mimeType: part.inlineData!.mimeType,
-      timestamp: Date.now()
-    });
+    if (inline) {
+      setPendingReferenceImage({
+        base64Data: inline.data,
+        mimeType: inline.mimeType,
+        timestamp: Date.now(),
+      });
+      return;
+    }
+    try {
+      const { base64, mimeType } = await imageUrlToBase64(file!.fileUri);
+      setPendingReferenceImage({
+        base64Data: base64,
+        mimeType,
+        timestamp: Date.now(),
+      });
+    } catch {
+      addToast('无法拉取该链接用于再次编辑（跨域限制）', 'error');
+    }
+  };
+
+  const imgSrc = inline
+    ? `data:${inline.mimeType};base64,${inline.data}`
+    : file!.fileUri;
+  const openLarge = () =>
+    inline
+      ? openImageInNewTab(inline.mimeType, inline.data)
+      : openImageUrlInNewTab(file!.fileUri);
+  const doDownload = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (inline) {
+      downloadImage(inline.mimeType, inline.data);
+      return;
+    }
+    downloadImageFromUrl(file!.fileUri, file!.mimeType).catch(() => addToast('下载失败', 'error'));
   };
 
   return (
@@ -110,11 +203,11 @@ const ImageWithDownload: React.FC<{ part: Part; index: number }> = ({ part, inde
       onMouseLeave={() => setIsImageHovered(false)}
     >
       <img
-        src={`data:${part.inlineData.mimeType};base64,${part.inlineData.data}`}
+        src={imgSrc}
         alt="Generated or uploaded content"
         className="h-auto max-w-full object-contain cursor-pointer"
         loading="lazy"
-        onClick={() => openImageInNewTab(part.inlineData!.mimeType, part.inlineData!.data)}
+        onClick={openLarge}
         title="点击查看大图"
       />
 
@@ -128,10 +221,7 @@ const ImageWithDownload: React.FC<{ part: Part; index: number }> = ({ part, inde
           <Edit className="h-5 w-5" />
         </button>
         <button
-          onClick={(e) => {
-            e.stopPropagation();
-            downloadImage(part.inlineData!.mimeType, part.inlineData!.data);
-          }}
+          onClick={doDownload}
           className="p-2.5 rounded-lg bg-black/60 hover:bg-black/80 text-white shadow-lg backdrop-blur-sm transition-all"
           title="下载图片"
         >
@@ -190,9 +280,9 @@ export const MessageBubble: React.FC<Props> = ({ message, isLast, isGenerating, 
     });
   };
 
-  // 检查是否是数据集生成消息（包含多张带 prompt 的图片）
-  const imageParts = message.parts.filter(p => p.inlineData && !p.thought);
-  const isDatasetMessage = !isUser && imageParts.length >= 5 && imageParts.some(p => p.prompt);
+  // 检查是否是数据集生成消息（包含多张带 prompt 的图片；仅统计 inline base64）
+  const imageParts = message.parts.filter((p) => p.inlineData && !p.thought);
+  const isDatasetMessage = !isUser && imageParts.length >= 5 && imageParts.some((p) => p.prompt);
 
   const handleDownloadDataset = async () => {
     try {
@@ -290,8 +380,8 @@ export const MessageBubble: React.FC<Props> = ({ message, isLast, isGenerating, 
       );
     }
     
-    // 3. Handle Images
-    if (part.inlineData) {
+    // 3. Handle Images（inline base64 或官方 fileUri）
+    if (part.inlineData || part.fileData) {
       return <ImageWithDownload key={index} part={part} index={index} />;
     }
     return null;

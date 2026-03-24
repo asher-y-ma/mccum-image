@@ -8,7 +8,7 @@ import {
   clampResolutionForModel,
   DEFAULT_IMAGE_MODEL,
 } from '../constants/geminiModels';
-import { createThumbnail } from '../utils/imageUtils';
+import { createThumbnail, imageUrlToBase64 } from '../utils/imageUtils';
 
 // Custom IndexedDB storage
 const storage: StateStorage = {
@@ -119,27 +119,42 @@ export const useAppStore = create<AppState>()(
         }),
 
       addImageToHistory: async (image) => {
+        let imgIn: ImageHistoryItem = { ...image };
+        if (imgIn.imageUrl && !imgIn.base64Data) {
+          try {
+            const { base64, mimeType } = await imageUrlToBase64(imgIn.imageUrl);
+            imgIn = {
+              ...imgIn,
+              base64Data: base64,
+              mimeType: mimeType || imgIn.mimeType,
+              imageUrl: undefined,
+            };
+          } catch (e) {
+            console.warn('历史记录：无法拉取远程图为 base64，将仅保留 URL 展示', e);
+          }
+        }
+
         // 分离存储：生成缩略图存入 State，原图存入 IDB
-        let thumbnail = image.thumbnailData;
-        if (!thumbnail && image.base64Data) {
+        let thumbnail = imgIn.thumbnailData;
+        if (!thumbnail && imgIn.base64Data) {
             try {
-                thumbnail = await createThumbnail(image.base64Data, image.mimeType);
+                thumbnail = await createThumbnail(imgIn.base64Data, imgIn.mimeType);
             } catch (e) {
                 console.error('Failed to create thumbnail', e);
             }
         }
 
         // 如果有原图数据，存入 IDB 并从 State 对象中移除
-        if (image.base64Data) {
+        if (imgIn.base64Data) {
             try {
-                await setVal(`image_data_${image.id}`, image.base64Data);
+                await setVal(`image_data_${imgIn.id}`, imgIn.base64Data);
             } catch (e) {
                 console.error('Failed to save image data to IDB', e);
             }
         }
 
         const newImageItem: ImageHistoryItem = {
-            ...image,
+            ...imgIn,
             thumbnailData: thumbnail,
             base64Data: undefined // 不在 State 中存储原图
         };
