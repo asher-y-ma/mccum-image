@@ -1,6 +1,6 @@
 import type { AppSettings, AspectRatioSetting } from '../types';
 
-/** 与 Pipeline 批量编排共用的图像模型列表（单一数据源） */
+/** 图像模型列表（设置与高级配置共用） */
 export const IMAGE_MODEL_OPTIONS = [
   { value: 'gemini-3-pro-image-preview', label: 'Gemini 3 Pro (Preview)' },
   { value: 'gemini-3.0-pro-image', label: 'Gemini 3 Pro flow' },

@@ -1,22 +1,24 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, ImagePlus, X, Square, Gamepad2, Sparkles, Layers, Workflow, Camera } from 'lucide-react';
+import { Send, ImagePlus, X, Square, Gamepad2, Sparkles, Camera } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { useUiStore } from '../store/useUiStore';
 import { Attachment } from '../types';
 import { PromptQuickPicker } from './PromptQuickPicker';
+
+/** 单次可添加的参考图上限 */
+const MAX_REFERENCE_IMAGES = 5;
 
 interface Props {
   onSend: (text: string, attachments: Attachment[]) => void;
   onStop: () => void;
   onOpenArcade?: () => void;
   isArcadeOpen?: boolean;
-  onOpenPipeline?: () => void;
   disabled: boolean;
 }
 
-export const InputArea: React.FC<Props> = ({ onSend, onStop, onOpenArcade, isArcadeOpen, onOpenPipeline, disabled }) => {
+export const InputArea: React.FC<Props> = ({ onSend, onStop, onOpenArcade, isArcadeOpen, disabled }) => {
   const { inputText, setInputText } = useAppStore();
-  const { togglePromptLibrary, isPromptLibraryOpen, batchMode, batchCount, setBatchMode, setBatchCount, pendingReferenceImage, setPendingReferenceImage } = useUiStore();
+  const { togglePromptLibrary, isPromptLibraryOpen, pendingReferenceImage, setPendingReferenceImage } = useUiStore();
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [isQuickPickerOpen, setIsQuickPickerOpen] = useState(false);
@@ -27,24 +29,29 @@ export const InputArea: React.FC<Props> = ({ onSend, onStop, onOpenArcade, isArc
 
   // 监听待添加的参考图片
   useEffect(() => {
-    if (pendingReferenceImage && attachments.length < 14) {
-      const { base64Data, mimeType, timestamp } = pendingReferenceImage;
-
-      // 创建一个虚拟 File 对象
-      const fileName = `image-${timestamp}.${mimeType.split('/')[1]}`;
-      const blob = base64ToBlob(`data:${mimeType};base64,${base64Data}`);
-      const file = new File([blob], fileName, { type: mimeType });
-
-      const newAttachment: Attachment = {
-        file,
-        preview: `data:${mimeType};base64,${base64Data}`,
-        base64Data,
-        mimeType
-      };
-
-      setAttachments(prev => [...prev, newAttachment].slice(0, 14));
-      setPendingReferenceImage(null); // 清除待添加图片
+    if (!pendingReferenceImage) return;
+    if (attachments.length >= MAX_REFERENCE_IMAGES) {
+      // 已满则丢弃待添加，避免 pending 一直存在导致后续无法再处理新待添加
+      setPendingReferenceImage(null);
+      return;
     }
+
+    const { base64Data, mimeType, timestamp } = pendingReferenceImage;
+
+    // 创建一个虚拟 File 对象
+    const fileName = `image-${timestamp}.${mimeType.split('/')[1]}`;
+    const blob = base64ToBlob(`data:${mimeType};base64,${base64Data}`);
+    const file = new File([blob], fileName, { type: mimeType });
+
+    const newAttachment: Attachment = {
+      file,
+      preview: `data:${mimeType};base64,${base64Data}`,
+      base64Data,
+      mimeType
+    };
+
+    setAttachments(prev => [...prev, newAttachment].slice(0, MAX_REFERENCE_IMAGES));
+    setPendingReferenceImage(null); // 清除待添加图片
   }, [pendingReferenceImage, attachments.length, setPendingReferenceImage]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -88,12 +95,12 @@ export const InputArea: React.FC<Props> = ({ onSend, onStop, onOpenArcade, isArc
       }
     }
 
-    setAttachments(prev => [...prev, ...newAttachments].slice(0, 14));
+    setAttachments(prev => [...prev, ...newAttachments].slice(0, MAX_REFERENCE_IMAGES));
   }, []);
 
   useEffect(() => {
     const handlePaste = (event: ClipboardEvent) => {
-      if (disabled || attachments.length >= 14) return;
+      if (disabled || attachments.length >= MAX_REFERENCE_IMAGES) return;
 
       const clipboardData = event.clipboardData;
       if (!clipboardData) return;
@@ -147,7 +154,7 @@ export const InputArea: React.FC<Props> = ({ onSend, onStop, onOpenArcade, isArc
     setIsDragging(false);
     dragCounter.current = 0;
 
-    if (disabled || attachments.length >= 14) return;
+    if (disabled || attachments.length >= MAX_REFERENCE_IMAGES) return;
 
     const files = Array.from(e.dataTransfer.files);
     await processFiles(files);
@@ -190,61 +197,6 @@ export const InputArea: React.FC<Props> = ({ onSend, onStop, onOpenArcade, isArc
   return (
     <div className="border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 p-4 pb-safe transition-colors duration-200">
       <div className="mx-auto max-w-4xl">
-
-        {/* Batch Mode Selector */}
-        {!disabled && (
-          <div className="flex items-center gap-2 mb-3">
-            <Layers className="h-4 w-4 text-gray-400" />
-            <div className="flex items-center gap-2 flex-1 flex-wrap">
-              <button
-                onClick={() => setBatchMode(batchMode === 'off' ? 'normal' : 'off')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
-                  batchMode === 'normal'
-                    ? 'bg-amber-500 text-white'
-                    : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
-                }`}
-              >
-                批量生成
-              </button>
-
-              {/* Pipeline Button */}
-              {onOpenPipeline && (
-                <button
-                  onClick={onOpenPipeline}
-                  className="px-3 py-1.5 rounded-lg text-xs font-medium transition bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 hover:bg-purple-200 dark:hover:bg-purple-800/40"
-                >
-                  <Workflow className="h-3 w-3 inline mr-1" />
-                  批量编排(实验功能)
-                </button>
-              )}
-
-              {batchMode === 'normal' && (
-                <div className="flex items-center gap-1 ml-2">
-                  <span className="text-xs text-gray-500 dark:text-gray-400">数量:</span>
-                  {[1, 2, 3, 4].map((num) => (
-                    <button
-                      key={num}
-                      onClick={() => setBatchCount(num)}
-                      className={`w-7 h-7 rounded text-xs font-medium transition ${
-                        batchCount === num
-                          ? 'bg-amber-500 text-white'
-                          : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
-                      }`}
-                    >
-                      {num}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {batchMode === 'normal' && (
-                <span className="text-xs text-amber-600 dark:text-amber-400 ml-auto">
-                  将生成 {batchCount} 次
-                </span>
-              )}
-            </div>
-          </div>
-        )}
 
         {/* Preview Area */}
         {attachments.length > 0 && (
@@ -309,7 +261,7 @@ export const InputArea: React.FC<Props> = ({ onSend, onStop, onOpenArcade, isArc
 
           <button
             onClick={() => fileInputRef.current?.click()}
-            disabled={disabled || attachments.length >= 14}
+            disabled={disabled || attachments.length >= MAX_REFERENCE_IMAGES}
             className="mb-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-amber-600 dark:hover:text-amber-400 transition disabled:opacity-50"
             title="上传图片"
           >
@@ -319,7 +271,7 @@ export const InputArea: React.FC<Props> = ({ onSend, onStop, onOpenArcade, isArc
           {/* 拍照按钮（仅移动端显示） */}
           <button
             onClick={() => cameraInputRef.current?.click()}
-            disabled={disabled || attachments.length >= 14}
+            disabled={disabled || attachments.length >= MAX_REFERENCE_IMAGES}
             className="mb-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-amber-600 dark:hover:text-amber-400 transition disabled:opacity-50 sm:hidden"
             title="拍照上传"
           >
@@ -383,10 +335,10 @@ export const InputArea: React.FC<Props> = ({ onSend, onStop, onOpenArcade, isArc
         </div>
         <div className="mt-2 text-center text-xs text-gray-400 dark:text-gray-500">
            <span className="hidden sm:inline">
-             回车发送,Shift + 回车换行。支持粘贴、拖拽或点击上传最多 14 张参考图片。输入 <span className="font-mono text-purple-600 dark:text-purple-400">/t</span> 快速选择提示词。
+             回车发送,Shift + 回车换行。支持粘贴、拖拽或点击上传最多 5 张参考图片。输入 <span className="font-mono text-purple-600 dark:text-purple-400">/t</span> 快速选择提示词。
            </span>
            <span className="sm:hidden">
-             点击发送按钮生成图片。支持上传、拍照最多 14 张参考图片。
+             点击发送按钮生成图片。支持上传、拍照最多 5 张参考图片。
            </span>
         </div>
       </div>

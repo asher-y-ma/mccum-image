@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { DEFAULT_IMAGE_MODEL } from '../constants/geminiModels';
-import { Key, ExternalLink, ChevronDown, ChevronRight, Settings2, X } from 'lucide-react';
+import { Key, ChevronDown, ChevronRight, Settings2, X } from 'lucide-react';
 
 interface ApiKeyModalProps {
   onClose?: () => void;
@@ -62,17 +62,8 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose }) => {
         <p className="mb-8 text-sm text-center text-gray-500 dark:text-gray-400">
           此应用 100% 在您的浏览器中运行。您的 Key 仅存储在本地设备上。
         </p>
-        <p className="mb-8 text-center text-gray-500 dark:text-gray-400">
-          获取API Key：
-          <a 
-            href="https://api.kuai.host/register?aff=z2C8" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="flex items-center text-m text-gray-500 hover:text-amber-600 dark:hover:text-amber-400 transition"
-          >
-            注册登录酷爱API后创建分组为【限时特价】的api密钥即可。
-            <ExternalLink className="ml-1 h-3 w-3" />
-          </a>
+        <p className="mb-8 text-sm text-center text-gray-500 dark:text-gray-400">
+          请使用本站发放的 API Key。如需开通或咨询，微信联系 <span className="text-[#07C160] font-medium">yunhe-shuju</span>。
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -117,7 +108,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose }) => {
                       value={endpoint}
                       onChange={(e) => setEndpoint(e.currentTarget.value)}
                       className="w-full rounded-md bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 focus:border-amber-500 focus:outline-none"
-                      placeholder="https://api.kuai.host"
+                      placeholder="https://mccum.com"
                     />
                   </div>
                   <div>
@@ -190,17 +181,9 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose }) => {
           </button>
         </form>
 
-        <div className="mt-6 flex justify-center">
-          <a 
-            href="https://cnb.cool/fuliai/comfyui/-/issues/11" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="flex items-center text-sm text-gray-500 hover:text-amber-600 dark:hover:text-amber-400 transition"
-          >
-            <span>加入交流群</span>
-            <ExternalLink className="ml-1 h-3 w-3" />
-          </a>
-        </div>
+        <p className="mt-6 text-center text-sm text-gray-500 dark:text-gray-400">
+          联系：微信 <span className="text-[#07C160] font-medium">yunhe-shuju</span>
+        </p>
       </div>
     </div>
   );

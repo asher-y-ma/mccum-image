@@ -17,8 +17,6 @@ export interface DialogOptions {
   type?: 'confirm' | 'alert';
 }
 
-export type BatchMode = 'off' | 'normal';
-
 export interface PendingReferenceImage {
   base64Data: string;
   mimeType: string;
@@ -29,8 +27,6 @@ interface UiState {
   toasts: Toast[];
   dialog: DialogOptions | null;
   isPromptLibraryOpen: boolean;
-  batchMode: BatchMode;
-  batchCount: number;
   showApiKeyModal: boolean;
   pendingReferenceImage: PendingReferenceImage | null;
 
@@ -40,8 +36,6 @@ interface UiState {
   closeDialog: () => void;
   togglePromptLibrary: () => void;
   closePromptLibrary: () => void;
-  setBatchMode: (mode: BatchMode) => void;
-  setBatchCount: (count: number) => void;
   setShowApiKeyModal: (show: boolean) => void;
   setPendingReferenceImage: (image: PendingReferenceImage | null) => void;
 }
@@ -50,8 +44,6 @@ export const useUiStore = create<UiState>((set) => ({
   toasts: [],
   dialog: null,
   isPromptLibraryOpen: false,
-  batchMode: 'off',
-  batchCount: 1,
   showApiKeyModal: false,
   pendingReferenceImage: null,
 
@@ -82,10 +74,6 @@ export const useUiStore = create<UiState>((set) => ({
     set((state) => ({ isPromptLibraryOpen: !state.isPromptLibraryOpen })),
 
   closePromptLibrary: () => set({ isPromptLibraryOpen: false }),
-
-  setBatchMode: (mode) => set({ batchMode: mode }),
-
-  setBatchCount: (count) => set({ batchCount: Math.max(1, Math.min(4, count)) }),
 
   setShowApiKeyModal: (show) => set({ showApiKeyModal: show }),
 

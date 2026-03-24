@@ -8,17 +8,16 @@ export interface BalanceInfo {
 }
 
 /**
- * 查询 API Key 的余额信息
- * 适用于 OpenAI 兼容的 API endpoint
+ * 查询 API Key 余额（NewAPI / OpenAI 兼容：subscription + usage）
+ * subscription 示例：hard_limit_usd、soft_limit_usd、system_hard_limit_usd
  */
 export const fetchBalance = async (
   apiKey: string,
   settings: AppSettings
 ): Promise<BalanceInfo> => {
-  const baseUrl = settings.customEndpoint || 'https://api.kuai.host';
+  const baseUrl = (settings.customEndpoint || 'https://mccum.com').replace(/\/$/, '');
 
   try {
-    // 1. 查询订阅信息(总额度)
     const subscriptionRes = await fetch(`${baseUrl}/v1/dashboard/billing/subscription`, {
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -29,14 +28,24 @@ export const fetchBalance = async (
       throw new Error(`订阅查询失败: ${subscriptionRes.status} ${subscriptionRes.statusText}`);
     }
 
-    const subscriptionData = await subscriptionRes.json();
-    const hardLimitUsd = subscriptionData.hard_limit_usd || 0;
+    const subscriptionData = (await subscriptionRes.json()) as {
+      hard_limit_usd?: number;
+      soft_limit_usd?: number;
+      system_hard_limit_usd?: number;
+    };
 
-    // 2. 查询使用情况(近99天 + 1天)
+    const hardLimitUsd =
+      subscriptionData.hard_limit_usd ??
+      subscriptionData.system_hard_limit_usd ??
+      subscriptionData.soft_limit_usd ??
+      0;
+
+    const isUnlimited = hardLimitUsd >= 100000000;
+
+    let totalUsage = 0;
     const now = new Date();
     const startDate = new Date(now.getTime() - 99 * 24 * 3600 * 1000);
     const endDate = new Date(now.getTime() + 1 * 24 * 3600 * 1000);
-    
     const pad = (n: number) => n.toString().padStart(2, '0');
     const startDateStr = `${startDate.getFullYear()}-${pad(startDate.getMonth() + 1)}-${pad(startDate.getDate())}`;
     const endDateStr = `${endDate.getFullYear()}-${pad(endDate.getMonth() + 1)}-${pad(endDate.getDate())}`;
@@ -50,16 +59,20 @@ export const fetchBalance = async (
       }
     );
 
-    if (!usageRes.ok) {
-      throw new Error(`使用量查询失败: ${usageRes.status} ${usageRes.statusText}`);
+    if (usageRes.ok) {
+      const usageData = (await usageRes.json()) as {
+        total_usage?: number;
+        /** 部分实现直接给美元 */
+        total_usage_usd?: number;
+      };
+      if (typeof usageData.total_usage_usd === 'number') {
+        totalUsage = usageData.total_usage_usd;
+      } else {
+        totalUsage = (usageData.total_usage ?? 0) / 100;
+      }
     }
 
-    const usageData = await usageRes.json();
-    const totalUsage = (usageData.total_usage || 0) / 100; // 转换为美元
-
-    // 3. 计算剩余额度
-    const isUnlimited = hardLimitUsd >= 100000000;
-    const remaining = isUnlimited ? Infinity : hardLimitUsd - totalUsage;
+    const remaining = isUnlimited ? Infinity : Math.max(0, hardLimitUsd - totalUsage);
 
     return {
       hardLimitUsd: isUnlimited ? Infinity : hardLimitUsd,

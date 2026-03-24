@@ -166,15 +166,7 @@ export const PromptLibraryPanel: React.FC<PromptLibraryPanelProps> = ({ onSelect
         {/* 底部说明 */}
         <div className="border-t border-gray-200 dark:border-gray-800 px-6 py-3 bg-gray-50 dark:bg-gray-800/50">
           <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
-            提示词来源：
-            <a
-              href="https://github.com/glidea/banana-prompt-quicker"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-amber-600 dark:text-amber-400 hover:underline ml-1"
-            >
-              banana-prompt-quicker
-            </a>
+            提示词来源：banana-prompt-quicker（社区整理）
           </p>
         </div>
       </div>

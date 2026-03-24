@@ -2,6 +2,79 @@ import type { Content, Part as SDKPart } from "@google/genai";
 import { AppSettings, Part } from '../types';
 import { buildImageConfig, DEFAULT_IMAGE_MODEL } from '../constants/geminiModels';
 
+const URL_IN_TEXT_RE = /https?:\/\/[^\s<>"']+/g;
+
+function trimTrailingUrlPunctuation(url: string): string {
+  return url.replace(/[)\].,;]+$/g, '');
+}
+
+/** 部分网关把 GCS 等签名链接写在 text 里而不给 fileData，需提升为 fileData 才能用图片组件展示 */
+function isLikelyDirectImageUrl(url: string): boolean {
+  const u = trimTrailingUrlPunctuation(url).toLowerCase();
+  if (!u.startsWith('http')) return false;
+  if (
+    u.includes('storage.googleapis.com') ||
+    u.includes('googleusercontent.com') ||
+    u.includes('gstatic.com') ||
+    u.includes('ai-sandbox') ||
+    u.includes('/image/') ||
+    /\.(png|jpe?g|webp|gif|bmp)(\?|$)/i.test(u)
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * 将正文里单独出现的图片 URL 抽成 fileData，并从 text 中移除，避免整段签名链接当 Markdown 展示。
+ */
+function promoteImageUrlsFromText(parts: Part[]): Part[] {
+  const urisAlreadyInParts = new Set(
+    parts
+      .filter((p) => p.fileData?.fileUri)
+      .map((p) => trimTrailingUrlPunctuation(p.fileData!.fileUri.trim()))
+  );
+  const out: Part[] = [];
+  for (const p of parts) {
+    if (p.thought || !p.text) {
+      out.push(p);
+      continue;
+    }
+    const matches = [...p.text.matchAll(URL_IN_TEXT_RE)];
+    const toStrip: string[] = [];
+    const urls: string[] = [];
+    const seenInText = new Set<string>();
+    for (const m of matches) {
+      const full = m[0];
+      const normalized = trimTrailingUrlPunctuation(full);
+      if (!isLikelyDirectImageUrl(normalized) || seenInText.has(normalized)) continue;
+      seenInText.add(normalized);
+      toStrip.push(full);
+      urls.push(normalized);
+    }
+    if (urls.length === 0) {
+      out.push(p);
+      continue;
+    }
+    let cleaned = p.text;
+    for (const fragment of toStrip) {
+      cleaned = cleaned.split(fragment).join('');
+    }
+    cleaned = cleaned.replace(/\s{2,}/g, ' ').trim();
+    if (cleaned.length > 0) {
+      out.push({ ...p, text: cleaned });
+    }
+    for (const uri of urls) {
+      if (urisAlreadyInParts.has(uri)) continue;
+      urisAlreadyInParts.add(uri);
+      out.push({
+        fileData: { mimeType: 'image/png', fileUri: uri },
+      });
+    }
+  }
+  return out;
+}
+
 /** 模型有时同时返回 fileData 与一段与 fileUri 相同的 text，去重避免重复展示 */
 function dedupeFileUriTextParts(parts: Part[]): Part[] {
   const uris = new Set(
@@ -24,7 +97,7 @@ function preferInlineImageOverFileUri(parts: Part[]): Part[] {
 }
 
 function normalizeModelImageParts(parts: Part[]): Part[] {
-  return preferInlineImageOverFileUri(dedupeFileUriTextParts(parts));
+  return preferInlineImageOverFileUri(dedupeFileUriTextParts(promoteImageUrlsFromText(parts)));
 }
 
 // Helper to construct user content
@@ -162,7 +235,7 @@ export const streamGeminiResponse = async function* (
 ) {
   const { GoogleGenAI } = await import("@google/genai");
   const ai = new GoogleGenAI(
-    { apiKey, httpOptions: { baseUrl: settings.customEndpoint || 'https://api.kuai.host' } }
+    { apiKey, httpOptions: { baseUrl: settings.customEndpoint || 'https://mccum.com' } }
   );
 
   // Filter out thought parts from history to avoid sending thought chains back to the model
@@ -291,7 +364,7 @@ export const generateContent = async (
 ) => {
   const { GoogleGenAI } = await import("@google/genai");
   const ai = new GoogleGenAI(
-    { apiKey, httpOptions: { baseUrl: settings.customEndpoint || 'https://api.kuai.host' } }
+    { apiKey, httpOptions: { baseUrl: settings.customEndpoint || 'https://mccum.com' } }
   );
 
   // Filter out thought parts from history
