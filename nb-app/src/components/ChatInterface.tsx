@@ -4,7 +4,7 @@ import { useUiStore } from '../store/useUiStore';
 import { InputArea } from './InputArea';
 import { ErrorBoundary } from './ErrorBoundary';
 import { streamGeminiResponse, generateContent } from '../services/geminiService';
-import { convertMessagesToHistory, partHasRenderableImage } from '../utils/messageUtils';
+import { partHasRenderableImage } from '../utils/messageUtils';
 import { ChatMessage, Attachment, Part } from '../types';
 import { Sparkles } from 'lucide-react';
 import { lazyWithRetry } from '../utils/lazyLoadUtils';
@@ -82,11 +82,6 @@ export const ChatInterface: React.FC = () => {
   };
 
   const executeSingleGeneration = async (text: string, attachments: Attachment[]) => {
-    // Capture the current messages state *before* adding the new user message.
-    // This allows us to generate history up to this point.
-    const currentMessages = useAppStore.getState().messages;
-    const history = convertMessagesToHistory(currentMessages);
-
     setLoading(true);
     const msgId = Date.now().toString();
 
@@ -140,7 +135,6 @@ export const ChatInterface: React.FC = () => {
       if (settings.streamResponse) {
           const stream = streamGeminiResponse(
             apiKey,
-            history, 
             text,
             imagesPayload,
             settings,
@@ -173,7 +167,6 @@ export const ChatInterface: React.FC = () => {
       } else {
           const result = await generateContent(
             apiKey,
-            history, 
             text,
             imagesPayload,
             settings,

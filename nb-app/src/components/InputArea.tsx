@@ -333,13 +333,16 @@ export const InputArea: React.FC<Props> = ({ onSend, onStop, onOpenArcade, isArc
             </button>
           )}
         </div>
-        <div className="mt-2 text-center text-xs text-gray-400 dark:text-gray-500">
-           <span className="hidden sm:inline">
-             回车发送,Shift + 回车换行。支持粘贴、拖拽或点击上传最多 5 张参考图片。输入 <span className="font-mono text-purple-600 dark:text-purple-400">/t</span> 快速选择提示词。
-           </span>
-           <span className="sm:hidden">
-             点击发送按钮生成图片。支持上传、拍照最多 5 张参考图片。
-           </span>
+        <div className="mt-2 space-y-1 text-center text-xs text-gray-400 dark:text-gray-500">
+           <p className="hidden sm:block">
+             回车发送，Shift + 回车换行。支持粘贴、拖拽或点击上传最多 5 张参考图片。输入 <span className="font-mono text-purple-600 dark:text-purple-400">/t</span> 快速选择提示词。
+           </p>
+           <p className="sm:hidden">
+             点击发送生成。支持上传、拍照最多 5 张参考图片。
+           </p>
+           <p className="text-amber-800/90 dark:text-amber-300/90">
+             单次请求互不关联，无法「接着上一张聊」。要改已有图请先点消息里图片上的「再次编辑」，把图加入参考图后再描述修改。
+           </p>
         </div>
       </div>
 

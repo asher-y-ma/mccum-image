@@ -227,7 +227,6 @@ const processSdkParts = (sdkParts: SDKPart[]): Part[] => {
 
 export const streamGeminiResponse = async function* (
   apiKey: string,
-  history: Content[],
   prompt: string,
   images: { base64Data: string; mimeType: string }[],
   settings: AppSettings,
@@ -238,20 +237,9 @@ export const streamGeminiResponse = async function* (
     { apiKey, httpOptions: { baseUrl: settings.customEndpoint || 'https://mccum.com' } }
   );
 
-  // Filter out thought parts from history to avoid sending thought chains back to the model
-  const cleanHistory = history.map(item => {
-    if (item.role === 'model') {
-      return {
-        ...item,
-        // 不回传 fileUri（易过期且非标准用户侧 inline），避免下游 400
-        parts: item.parts.filter((p) => !p.thought && !(p as Part).fileData),
-      };
-    }
-    return item;
-  }).filter(item => item.parts.length > 0);
-
+  /** 每次请求只发当前轮 user 内容，不带历史多轮（产品：非多轮对话） */
   const currentUserContent = constructUserContent(prompt, images);
-  const contentsPayload = [...cleanHistory, currentUserContent];
+  const contentsPayload = [currentUserContent];
   const imageConfig = buildImageConfig(settings);
 
   try {
@@ -356,7 +344,6 @@ export const streamGeminiResponse = async function* (
 
 export const generateContent = async (
   apiKey: string,
-  history: Content[],
   prompt: string,
   images: { base64Data: string; mimeType: string }[],
   settings: AppSettings,
@@ -367,20 +354,8 @@ export const generateContent = async (
     { apiKey, httpOptions: { baseUrl: settings.customEndpoint || 'https://mccum.com' } }
   );
 
-  // Filter out thought parts from history
-  const cleanHistory = history.map(item => {
-    if (item.role === 'model') {
-      return {
-        ...item,
-        // 不回传 fileUri（易过期且非标准用户侧 inline），避免下游 400
-        parts: item.parts.filter((p) => !p.thought && !(p as Part).fileData),
-      };
-    }
-    return item;
-  }).filter(item => item.parts.length > 0);
-
   const currentUserContent = constructUserContent(prompt, images);
-  const contentsPayload = [...cleanHistory, currentUserContent];
+  const contentsPayload = [currentUserContent];
   const imageConfig = buildImageConfig(settings);
 
   try {
