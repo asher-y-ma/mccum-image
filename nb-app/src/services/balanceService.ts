@@ -15,7 +15,7 @@ export const fetchBalance = async (
   apiKey: string,
   settings: AppSettings
 ): Promise<BalanceInfo> => {
-  const baseUrl = (settings.customEndpoint || 'https://mccum.com').replace(/\/$/, '');
+  const baseUrl = (settings.customEndpoint || 'https://newapi.dituhuoke.com').replace(/\/$/, '');
 
   try {
     const subscriptionRes = await fetch(`${baseUrl}/v1/dashboard/billing/subscription`, {

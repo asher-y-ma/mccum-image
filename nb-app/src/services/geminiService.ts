@@ -234,7 +234,7 @@ export const streamGeminiResponse = async function* (
 ) {
   const { GoogleGenAI } = await import("@google/genai");
   const ai = new GoogleGenAI(
-    { apiKey, httpOptions: { baseUrl: settings.customEndpoint || 'https://mccum.com' } }
+    { apiKey, httpOptions: { baseUrl: settings.customEndpoint || 'https://newapi.dituhuoke.com' } }
   );
 
   /** 每次请求只发当前轮 user 内容，不带历史多轮（产品：非多轮对话） */
@@ -351,7 +351,7 @@ export const generateContent = async (
 ) => {
   const { GoogleGenAI } = await import("@google/genai");
   const ai = new GoogleGenAI(
-    { apiKey, httpOptions: { baseUrl: settings.customEndpoint || 'https://mccum.com' } }
+    { apiKey, httpOptions: { baseUrl: settings.customEndpoint || 'https://newapi.dituhuoke.com' } }
   );
 
   const currentUserContent = constructUserContent(prompt, images);

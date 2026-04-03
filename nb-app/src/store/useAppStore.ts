@@ -63,7 +63,7 @@ export const useAppStore = create<AppState>()(
         useGrounding: false,
         enableThinking: false,
         streamResponse: true,
-        customEndpoint: 'https://mccum.com',
+        customEndpoint: 'https://newapi.dituhuoke.com',
         modelName: DEFAULT_IMAGE_MODEL,
         theme: 'system',
       },
